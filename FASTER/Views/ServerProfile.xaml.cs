@@ -569,7 +569,17 @@ namespace FASTER.Views
             }
             IHeadlessModsCount.Content = IHeadlessModsList.Items.Cast<object>().Count(i => ((CheckBox) i).IsChecked == true);
         }
-        
+
+        private void ICopyFromServerMods_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (CheckBox cb in IServerModsList.Items)
+            {
+                var c = ((CheckBox)IClientModsList.Items.GetItemAt(IServerModsList.Items.IndexOf(cb)));
+                c.IsChecked = cb.IsChecked;
+            }
+            IClientModsCount.Content = IClientModsList.Items.Cast<object>().Count(i => ((CheckBox)i).IsChecked == true);
+        }
+
         private async void ICopyModsKeys_Click(object sender, RoutedEventArgs e)
         {
             ICopyModsKeys.IsEnabled = false;
