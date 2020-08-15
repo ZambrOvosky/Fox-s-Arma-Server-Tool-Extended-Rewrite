@@ -17,6 +17,8 @@ using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using FASTER.ViewModel;
+using Microsoft.AppCenter.Crashes;
 
 namespace FASTER
 {
@@ -82,6 +84,21 @@ namespace FASTER
         {
             get => _about ??= new About();
             set => _about = value;
+        }
+
+        Profile _profile;
+        public Profile ContentProfile
+        {
+            get => _profile ??= new Profile();
+            set => _profile = value;
+        }
+
+        private List<ProfileViewModel> _profileViews;
+
+        internal List<ProfileViewModel> ContentProfileViews
+        {
+            get => _profileViews ??= new List<ProfileViewModel>();
+            set => _profileViews = value;
         }
         #endregion
 
@@ -165,7 +182,10 @@ namespace FASTER
                     break;
                 default:
                     if (IServerProfilesMenu.Items.Cast<ToggleButton>().FirstOrDefault(p => p.Name == nav.Name) != null)
-                    { MainContent.Navigate(ContentProfiles.First(p => p.Name == nav.Name)); }
+                    {
+                        ContentProfile.DataContext = ContentProfileViews.First(p => p.Profile.Id == nav.Name);
+                        MainContent.Navigate(ContentProfile);
+                    }
                     break;
             }
         }
@@ -209,17 +229,26 @@ namespace FASTER
             if (IServerProfilesMenu.SelectedIndex == -1)
             { return; }
 
-            var temp = Properties.Settings.Default.Servers.ServerProfiles.FirstOrDefault(s => s.SafeName == ((ToggleButton)IServerProfilesMenu.SelectedItem).Name);
-            if (temp == null)
+            try
             {
-                DisplayMessage("Could not find the selected profile.");
-                return;
-            }
+                var temp = Properties.Settings.Default.Servers.ServerProfiles.FirstOrDefault(s =>
+                    s.SafeName == ((ToggleButton) IServerProfilesMenu.SelectedItem).Name);
+                if (temp == null)
+                {
+                    DisplayMessage("Could not find the selected profile.");
+                    return;
+                }
 
-            Models.ServerProfile serverProfile = temp.CloneObjectSerializable();
-            serverProfile.DisplayName += " 2";
-            serverProfile.SafeName = "_" + Functions.SafeName(serverProfile.DisplayName);
-            ServerCollection.AddServerProfile(serverProfile);
+                Models.ServerProfile serverProfile = temp.CloneObjectSerializable();
+                serverProfile.DisplayName += " 2";
+                serverProfile.SafeName = "_" + Functions.SafeName(serverProfile.DisplayName);
+                ServerCollection.AddServerProfile(serverProfile);
+            }
+            catch (Exception err)
+            {
+                DisplayMessage("An error occured while cloning your profile");
+                Crashes.TrackError(err, new Dictionary<string, string> { { "Name", Properties.Settings.Default.steamUserName } });
+            }
         }
 
         private void InstallSteamCmd_Click(object sender, RoutedEventArgs e)
@@ -314,13 +343,14 @@ namespace FASTER
             var currentProfiles = Properties.Settings.Default.Servers;
             Dispatcher?.Invoke(() => { IServerProfilesMenu.Items.Clear(); });
 
-            ContentProfiles.Clear();
+            ContentProfileViews.Clear();
 
             foreach (var profile in currentProfiles.ServerProfiles)
             {
+                Guid id = Guid.NewGuid();
                 ToggleButton newItem = new ToggleButton
                 {
-                    Name = profile.SafeName,
+                    Name = $"_{id:N}",
                     Content = profile.DisplayName,
                     Style = (Style)FindResource("MahApps.Styles.ToggleButton.WindowCommands"),
                     Padding = new Thickness(10, 2, 0, 2),
@@ -334,10 +364,13 @@ namespace FASTER
 
                 newItem.Click += ToggleButton_Click;
 
-                if (ContentProfiles.Any(tab => profile.SafeName == tab.Name)) 
+                if (ContentProfileViews.Any(tab => profile.SafeName == tab.ServerCfg.Hostname)) 
                     continue;
 
-                ContentProfiles.Add(new Views.ServerProfile(profile) { Name = profile.SafeName});
+                //TODO change this later on to load Profiles
+                var p = new ProfileViewModel(profile.DisplayName, id);
+
+                ContentProfileViews.Add(p);
             }
         }
 
